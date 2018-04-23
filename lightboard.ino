@@ -4,8 +4,15 @@
 #endif
 #define NUM_STRIPS 15
 #define NUM_LEDS 73
-uint32_t life_matrix[2][NUM_LEDS*NUM_STRIPS];
-uint8_t frame, color_nonce;
+#define TOTAL_LEDS NUM_STRIPS*NUM_LEDS
+#define get_led(x,y) x+y*NUM_LEDS
+#define get_x(p) p%NUM_LEDS
+#define get_y(p) p/NUM_LEDS
+#define for_x for (int x = 0; x < NUM_LEDS; x++)
+#define for_y for (int y = 0; y < NUM_STRIPS; y++)
+#define for_xy for_x for_y
+uint8_t life_matrix[NUM_STRIPS];
+uint8_t color_nonce;
 Adafruit_NeoPixel strips[NUM_STRIPS];
 static char font[128][8] = {
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},   // U+0000 (nul)
@@ -139,7 +146,6 @@ static char font[128][8] = {
 };
 
 void setup() {
-  frame = 0;
   color_nonce = 0;
   for (uint8_t i=0; i < NUM_STRIPS; ++i) {
     strips[i] = Adafruit_NeoPixel(NUM_LEDS, i, NEO_GRB + NEO_KHZ800);
@@ -149,39 +155,68 @@ void setup() {
 }
 
 void loop() {
-  for (uint8_t i=0; i < NUM_STRIPS; ++i) {
-    turnRed(strips[i]);
-    delay(500);
-  }
+  clear_board();
+  
+  show_board();
+  color_nonce++;
 }
 
 void turnRed(Adafruit_NeoPixel strip) {
   for (uint8_t i=0; i<NUM_LEDS; i++) {
-    strip.setPixelColor(i, color(1));
+    strip.setPixelColor(i, color(1, 1));
   }
   strip.show(); // This sends the updated pixel color to the hardware.
 }
-void shuffle(uint32_t board[NUM_LEDS*NUM_STRIPS]) {
-  for (uint32_t i=0; i<NUM_LEDS*NUM_STRIPS; i++) {
-    //TODO
+
+// Conways game of life
+void life_setup() {
+  shuffle(life_matrix);
+}
+
+void life_step() {
+  for (int i=0; i<TOTAL_LEDS; i++) {
+    uint8_t neighbors = 0;
+    uint8_t x = get_x(i);
+    uint8_t y = get_y(i);
+    if (x>0) {
+      // TODO implement
+    }
   }
 }
 
-uint32_t color(uint16_t pos) {
-  uint8_t x = pos % NUM_LEDS;
-  uint8_t y = pos / NUM_STRIPS;
-  //TODO
-  return strips[0].Color(255, 0,0);
+void render_frame(uint8_t board[TOTAL_LEDS]) {
+  for (int i=0; i<TOTAL_LEDS; i++) {
+    uint8_t x = get_x(i);
+    uint8_t y = get_y(i);
+    strips[y].setPixelColor(x, board[i]?color(x, y):0);
+  }
 }
 
-void render_string(char *input, uint8_t xpos, uint8_t ypo) {
+void shuffle(uint8_t board[TOTAL_LEDS]) {
+  for (int i=0; i<TOTAL_LEDS; i++) {
+    board[i] = random(1)?1:0;
+  }
+}
+
+// String rendering
+
+void render_string(char *input, uint8_t xpos, uint8_t ypos) {
   int len = strlen(input);
   // parse every character
   for(int i=0; i<len; i++) {
     char c = input[i];
     char char_matrix[8];
     get_char_matrix(c, char_matrix);
-    //TODO render in light strip
+    int x_offset = xpos+8*i;
+    for (int x=0; x<8; x++) {
+      for (int y=0; y<8; y++) {
+        if (char_matrix[x] & 1 << y) {
+          uint8_t y_pix = ypos+y;
+          uint8_t x_pix = x_offset+x;
+          strips[y_pix].setPixelColor(x_pix, color(x_pix, y_pix));
+        }
+      }
+    }
   }
 }
 
@@ -197,6 +232,26 @@ void get_char_matrix(char c, char out[8]) {
       }
     }
   }
+}
+
+// Utils
+
+uint32_t color(uint8_t x, uint8_t y) {
+  uint8_t r, g, b;
+  r = strips[0].sine8(x+color_nonce);
+  g = strips[0].sine8(y+color_nonce);
+  b = strips[0].sine8(x-color_nonce);
+  return strips[0].Color(r,g,b);
+}
+
+void clear_board() {
+  for (int i=0; i<NUM_STRIPS; ++i)
+    strips[i].clear();
+}
+
+void show_board() {
+  for (int i=0; i<NUM_STRIPS; ++i)
+    strips[i].show();
 }
 
 
